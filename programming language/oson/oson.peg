@@ -1,0 +1,26 @@
+oson <- object ~;
+
+object <- white begin white p:(pair)* white end white `
+    PairsNode = proplists:get_value(p, Node),
+    Pairs = [P || P <- PairsNode],
+    {object, Pairs}
+`;
+
+pair <- white k:key white ":" white v:value white `
+    {proplists:get_value(k, Node), proplists:get_value(v, Node)}
+`;
+key <- atom ~;
+value <- string / object / null ~;
+
+begin <- "(" ~;
+end <- ")" ~;
+atom <- [a-zA-Z0-9_]+ `
+    list_to_binary(Node)
+`;
+null <- "null" `
+    null
+`;
+string <- '"' str:[^"]* '"' `
+        {string, list_to_binary(proplists:get_value(str, Node))}
+`;
+white <- [ \t\n\s\r]* ~;

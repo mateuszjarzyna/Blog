@@ -1,0 +1,8 @@
+(
+    some_key : "asda"
+    another_key : (
+        inner : "uf"
+        empty : ()
+    )
+    not_found : null
+)
