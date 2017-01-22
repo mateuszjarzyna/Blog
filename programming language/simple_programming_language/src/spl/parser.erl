@@ -2,45 +2,51 @@
 
 -export([run/3]).
 
--define(FUN_VARS(F), list_to_atom(lists:flatten(io_lib:format("function_~p_variables", [F])))).
 -define(FUNS, functions).
--define(ACC_FUN, accctual_function).
 
 run(FileName, FunToRun, Args) ->
 	{_ClassName, Functions} = spl:file(FileName),
 	put(?FUNS, #{}),
 	parse_functions(Functions),
-        {ArgsNames, Operations} = get_function(FunToRun),
-        parse_fun(FunToRun, Operations, ArgsNames, Args).
+    {ArgsNames, Operations} = get_function(FunToRun),
+    parse_fun(Operations, ArgsNames, Args).
 
-parse_fun(FunName, Operations, ArgsNames, ArgsToSet) ->
-	put(?ACC_FUN, FunName),
-        put(?FUN_VARS(get(?ACC_FUN)), #{}),
-	set_args(ArgsNames, ArgsToSet),
-	OperationsResults = parse(Operations),
-	lists:last(OperationsResults).
+parse_fun(Operations, ArgsNames, ArgsToSet) ->
+	Vars = #{},
+	Vars2 = set_args(ArgsNames, ArgsToSet, Vars),
+    {FunctionResult, _LastVars} = parse(Operations, Vars2),
+    FunctionResult.
 
-parse(Operations) when is_list(Operations) ->
-	[parse(Op) || Op <- Operations];
-parse({if_else, Expression, WhenTrue, WhenFalse}) ->
-	ExprRes = parse(Expression),
-	case ExprRes of
-		true -> parse(WhenTrue);
-		false -> parse(WhenFalse)
+parse(Operations, Vars) when is_list(Operations) ->
+    lists:foldl(fun(Operation, {_LastRes, AccVars}) ->
+                    parse(Operation, AccVars)
+                end,
+                {true, Vars},
+                Operations
+                );
+parse({if_else, Expression, WhenTrue, WhenFalse}, Vars) ->
+    {ParsedExpression, Vars2} = parse(Expression, Vars),
+	case ParsedExpression of
+		true -> parse(WhenTrue, Vars2);
+		false -> parse(WhenFalse, Vars2)
 	end;
-parse({greather_than, Left, Right}) ->
-	parse(Left) > parse(Right);
-parse({assign_variable, Name, Value}) ->
-	assign_variable(Name, parse(Value)),
-	true;
-parse({variable, Name}) ->
-	get_variable(Name);
-parse({string, String}) ->
-	String;
-parse({number, Number}) ->
-	Number;
-parse(UnknowOp) ->
-	io:format("Unknown operation ~p\n", [UnknowOp]).
+parse({greater_than, Left, Right}, Vars) ->
+    {ParsedLeft, Vars2} = parse(Left, Vars),
+    {ParsedRight, Vars3} = parse(Right, Vars2),
+    Value = ParsedLeft > ParsedRight,
+    {Value, Vars3};
+parse({assign_variable, Name, Value}, Vars) ->
+    {Parsed, Vars2} = parse(Value, Vars),
+    Vars3 = assign_variable(Name, Parsed, Vars2),
+    {true, Vars3};
+parse({variable, Name}, Vars) ->
+    {get_variable(Name, Vars), Vars};
+parse({string, String}, Vars) ->
+    {String, Vars};
+parse({number, Number}, Vars) ->
+    {Number, Vars};
+parse(UnknownOp, _Vars) ->
+	io:format("Unknown operation ~p\n", [UnknownOp]).
 
 parse_functions(Functions) ->
 	[add_function(Name, ArgsNames, Operations) || {Name, ArgsNames, Operations} <- Functions].
@@ -52,17 +58,14 @@ get_function(FunName) ->
 	Funs = get(?FUNS),
 	maps:get(FunName, Funs).
 
-set_args([] = _FunArgsNames, [] = _ArgsToSet) ->
-	done;
-set_args([Name | RestFunArgsNames], [Value | RestArgsToSet]) ->
-	assign_variable(Name, Value),
-	set_args(RestFunArgsNames, RestArgsToSet).
+set_args([] = _FunArgsNames, [] = _ArgsToSet, Vars) ->
+	Vars;
+set_args([Name | RestFunArgsNames], [Value | RestArgsToSet], Vars) ->
+	Vars2 = assign_variable(Name, Value, Vars),
+	set_args(RestFunArgsNames, RestArgsToSet, Vars2).
 
-assign_variable(Name, Value) ->
-	Vars = get(?FUN_VARS(get(?ACC_FUN))),
-	Vars2 = maps:put(Name, Value, Vars),
-	put(?FUN_VARS(get(?ACC_FUN)), Vars2).
+assign_variable(Name, Value, Vars) ->
+	maps:put(Name, Value, Vars).
 
-get_variable(Name) ->
-	Vars = get(?FUN_VARS(get(?ACC_FUN))),
-	maps:get(Name, Vars, undefined).
+get_variable(Name, Vars) ->
+    maps:get(Name, Vars, undefined).

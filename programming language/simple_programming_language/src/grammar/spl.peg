@@ -64,13 +64,13 @@ equals <- left:variable_value white "==" white right:variable_value `
 gt <- left:variable_value white ">" white right:variable_value `
     Left = proplists:get_value(left, Node),
     Right = proplists:get_value(right, Node),
-    {greather_than, Left, Right}
+    {greater_than, Left, Right}
 `;
 
 gte <- left:variable_value white ">=" white right:variable_value `
     Left = proplists:get_value(left, Node),
     Right = proplists:get_value(right, Node),
-    {greather_than_equals, Left, Right}
+    {greater_than_equals, Left, Right}
 `;
 
 lt <- left:variable_value white "<" white right:variable_value `
