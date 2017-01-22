@@ -1,0 +1,151 @@
+spl <- white "class(" name:atom ")" white funs:(function)+ white`
+    ClassName = proplists:get_value(name, Node),
+    Functions = proplists:get_value(funs, Node),
+    {ClassName, Functions}
+`;
+
+function <- white "fun" white fun_name:atom "(" white args:fun_args white ")" white "{" white body:fun_body white "}" white `
+    Body = proplists:get_value(body, Node),
+    %io:format("\nbody: ~p\n" ,[Body]),
+    FunName = proplists:get_value(fun_name, Node),
+    Args = proplists:get_value(args, Node),
+    {FunName, Args, Body}
+`;
+
+fun_args <- first:atom? rest:(white "," white atom)* `
+    First = proplists:get_value(first, Node),
+    Rest = [lists:nth(4, L) || L <- proplists:get_value(rest, Node)],
+    Parameters = case First of
+        [] -> [];
+        _ -> [First] ++ Rest
+    end,
+    Parameters
+`;
+
+fun_body <- white opers:(white operation white)+ `
+    Operations = proplists:get_value(opers, Node),
+    [lists:nth(2, O) || O <- Operations]
+`;
+
+operation <- assign_variable / call_external_function / call_self_function / if / loop / read_variable ~;
+
+assign_variable <- var_name:atom white "=" white var_val:variable_value `
+    VarName = proplists:get_value(var_name, Node),
+    VarVal = proplists:get_value(var_val, Node),
+    {assign_variable, VarName, VarVal}
+`;
+
+if <- if_else / only_if ~;
+
+only_if <- "if" white "(" white log_expr:logical_expr white ")" white "{" white body:fun_body white "}" white `
+    Body = proplists:get_value(body, Node),
+    Expression = proplists:get_value(log_expr, Node),
+    {only_if, Expression, Body}
+`;
+
+if_else <- "if" white "(" white log_expr:logical_expr white ")" white "{" white if_body:fun_body white "}" white "else" white "{" white else_body:fun_body white "}" white `
+    IfBody = proplists:get_value(if_body, Node),
+    ElseBody = proplists:get_value(else_body, Node),
+    Expression = proplists:get_value(log_expr, Node),
+    {if_else, Expression, IfBody, ElseBody}
+`;
+
+
+logical_expr <- bool / comparators ~;
+
+comparators <- equals / gte / gt / lte / lt ~;
+
+equals <- left:variable_value white "==" white right:variable_value `
+    Left = proplists:get_value(left, Node),
+    Right = proplists:get_value(right, Node),
+    {equals, Left, Right}
+`; 
+
+gt <- left:variable_value white ">" white right:variable_value `
+    Left = proplists:get_value(left, Node),
+    Right = proplists:get_value(right, Node),
+    {greather_than, Left, Right}
+`;
+
+gte <- left:variable_value white ">=" white right:variable_value `
+    Left = proplists:get_value(left, Node),
+    Right = proplists:get_value(right, Node),
+    {greather_than_equals, Left, Right}
+`;
+
+lt <- left:variable_value white "<" white right:variable_value `
+    Left = proplists:get_value(left, Node),
+    Right = proplists:get_value(right, Node),
+    {less_than, Left, Right}
+`;
+
+lte <- left:variable_value white "=<" white right:variable_value `
+    Left = proplists:get_value(left, Node),
+    Right = proplists:get_value(right, Node),
+    {less_than_equals, Left, Right}
+`;
+
+variable_value <- string / number / bool / call_external_function / call_self_function / read_variable~;
+
+read_variable <- atom `
+    {variable, Node}
+`;
+
+call_external_function <- class_name:atom ":" fun_name:atom "(" white args:call_fun_args white ")" `
+    ClassName = proplists:get_value(class_name, Node),
+    FunName = proplists:get_value(fun_name, Node),
+    Args = proplists:get_value(args, Node),
+    {call_external_function, ClassName, FunName, Args} 
+`;
+
+call_self_function <- fun_name:atom "(" white args:call_fun_args white ")" `
+    FunName = proplists:get_value(fun_name, Node),
+    Args = proplists:get_value(args, Node),
+    {call_self_function, FunName, Args}
+`;
+
+call_fun_args <- first:variable_value? rest:(white "," white variable_value)* `
+    First = proplists:get_value(first, Node),
+    Rest = [lists:nth(4, L) || L <- proplists:get_value(rest, Node)],
+    Parameters = case First of
+        [] -> [];
+        _ -> [First] ++ Rest
+    end,
+    Parameters
+`;
+
+loop <- "while" white "(" white log_expr:logical_expr white ")" white "{" white body:fun_body white "}" `
+    Body = proplists:get_value(body, Node),
+    Expression = proplists:get_value(log_expr, Node),
+    {while, Expression, Body}
+`;
+
+bool <- true / false ~;
+true <- "true" `
+    {boolean, true}
+`;
+false <- "false" `
+    {boolean, false}
+`;
+number <- int frac? exp? `
+    Num = case Node of
+        [Int, [], []] -> list_to_integer(binary_to_list(iolist_to_binary(Int)));
+        [Int, Frac, []] -> list_to_float(binary_to_list(iolist_to_binary([Int, Frac])));
+        [Int, [], Exp] -> list_to_float(binary_to_list(iolist_to_binary([Int, ".0", Exp])));
+        _ -> list_to_float(binary_to_list(iolist_to_binary(Node)))
+    end,
+    {number, Num}
+`;
+int <- '-'? (non_zero_digit digit+) / digit ~;
+frac <- '.' digit+ ~;
+exp <- e digit+ ~;
+e <- [eE] ('+' / '-')? ~;
+non_zero_digit <- [1-9] ~;
+digit <- [0-9] ~;
+string <- '"' str:[^"]* '"' `
+    {string, list_to_binary(proplists:get_value(str, Node))}
+`;
+atom <- [a-zA-Z0-9_]+ `
+    binary_to_atom(list_to_binary(Node), utf8)
+`;
+white <- [ \t\n\s\r]* ~;
