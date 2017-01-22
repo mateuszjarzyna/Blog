@@ -45,7 +45,7 @@ init([]) ->
     }}.
 
 handle_call({parse_class, FileName}, _From, State = #state{classes = Classes}) ->
-    {ClassName, Functions} = spl:file(FileName),
+    {ClassName, Functions} = spl_grammar:file(FileName),
     ParsedFunctions = parse_functions(Functions),
     Classes2 = maps:put(ClassName, ParsedFunctions, Classes),
     {reply, ok, State#state{
