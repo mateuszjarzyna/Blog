@@ -15,6 +15,9 @@
 
 -define(SERVER, ?MODULE).
 
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(CHILD(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
+
 %%====================================================================
 %% API functions
 %%====================================================================
@@ -28,7 +31,10 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+    Children = [
+            ?CHILD(spl_manager, worker, [])
+        ],
+    {ok, { {one_for_all, 0, 1}, Children} }.
 
 %%====================================================================
 %% Internal functions

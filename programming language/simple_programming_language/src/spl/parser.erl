@@ -2,13 +2,8 @@
 
 -export([run/3]).
 
--define(FUNS, functions).
-
-run(FileName, FunToRun, Args) ->
-	{_ClassName, Functions} = spl:file(FileName),
-	put(?FUNS, #{}),
-	parse_functions(Functions),
-    {ArgsNames, Operations} = get_function(FunToRun),
+run(ClassToRun, FunToRun, Args) ->
+    {ArgsNames, Operations} = spl_manager:get_function(ClassToRun, FunToRun),
     parse_fun(Operations, ArgsNames, Args).
 
 parse_fun(Operations, ArgsNames, ArgsToSet) ->
@@ -47,16 +42,6 @@ parse({number, Number}, Vars) ->
     {Number, Vars};
 parse(UnknownOp, _Vars) ->
 	io:format("Unknown operation ~p\n", [UnknownOp]).
-
-parse_functions(Functions) ->
-	[add_function(Name, ArgsNames, Operations) || {Name, ArgsNames, Operations} <- Functions].
-add_function(Name, ArgsNames, Operations) ->
-	Funs = get(?FUNS),
-	Funs2 = maps:put(Name, {ArgsNames, Operations}, Funs),
-	put(?FUNS, Funs2).
-get_function(FunName) ->
-	Funs = get(?FUNS),
-	maps:get(FunName, Funs).
 
 set_args([] = _FunArgsNames, [] = _ArgsToSet, Vars) ->
 	Vars;
